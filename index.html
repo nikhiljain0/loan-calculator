@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LoanJs browser example</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    .form-row {
+      margin: 10px 0;
+    }
+    .form-row label {
+      display: inline-block;
+      width: 120px;
+    }
+
+    table {
+      border-spacing: 0;
+    }
+
+    td,
+    th {
+      border-right: 1px solid #ddd;
+      padding: 6px 12px;
+    }
+
+    td {
+      text-align: right;
+    }
+
+    th {
+      border-bottom: 2px solid #ddd;
+      padding: 12px;
+    }
+
+    td:last-child,
+    th:last-child {
+      border-right: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Calculate Loan example:</h1>
+
+  <div id="tableBox">
+    <div class="form-row">
+      <label for="amount">Amount:</label>
+      <input id="amount" value="100000">
+    </div>
+    <div class="form-row">
+      <label for="months">Months:</label>
+      <input id="months" value="120">
+    </div>
+    <div class="form-row">
+      <label for="interestRate">Interest rate:</label>
+      <input id="interestRate" value="4">%
+    </div>
+    <div class="form-row">
+      <label for="equal">Equal/Annual:</label>
+      <input id="equal" type="checkbox" checked>
+    </div>
+    <div class="form-row">
+      <label></label>
+      <button id="calculate">Calculate</button>
+    </div>
+
+  </div>
+
+  <script>
+      "use strict";
+
+function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
+
+(function () {
+  'use strict';
+  /*
+   * LoanJS
+   * Calculating loan in equal or diminishing installments
+   * https://github.com/kfiku/LoanJS
+   *
+   * Copyright (c) 2014 Grzegorz Klimek
+   * Licensed under the MIT license.
+   */
+
+  /**
+   * Round helper function
+   * @param {number} num number to round (example 123.4355 -> 123.44)
+   *
+   * @returns {number}
+   */
+
+  function rnd(num) {
+    return Math.round(num * 100) / 100;
+  }
+  /*
+   * LoanJS
+   * Calculating loan in equal or diminishing installments
+   * https://github.com/kfiku/LoanJS
+   *
+   * Copyright (c) 2014 Grzegorz Klimek
+   * Licensed under the MIT license.
+   */
+
+  /**
+   * Method to getting next instalment
+   * @param {number} amount
+   * @param {number} installmentsNumber
+   * @param {number} interestRate
+   * @param {boolean} diminishing
+   * @param {number} capitalSum
+   * @param {number} interestSum
+   *
+   * @returns {{ capital: number, interest: number, installment: number, remain: number, interestSum: number }}
+   */
+
+
+  var getNextInstalment = function getNextInstalment(amount, installmentsNumber, interestRate, diminishing, capitalSum, interestSum) {
+    var capital;
+    var interest;
+    var installment;
+    var irmPow;
+    var interestRateMonth = interestRate / 1200;
+
+    if (diminishing) {
+      capital = rnd(amount / installmentsNumber);
+      interest = rnd((amount - capitalSum) * interestRateMonth);
+      installment = capital + interest;
+    } else {
+      irmPow = Math.pow(1 + interestRateMonth, installmentsNumber);
+      installment = rnd(amount * (interestRateMonth * irmPow / (irmPow - 1)));
+      interest = rnd((amount - capitalSum) * interestRateMonth);
+      capital = installment - interest;
+    }
+
+    return {
+      capital: capital,
+      interest: interest,
+      installment: installment,
+      remain: amount - capitalSum - capital,
+      interestSum: interestSum + interest
+    };
+  };
+  /**
+   * Create Loan Object with all installments and sum of interest
+   *
+   * @param {number} amount                   full amount of Loan
+   * @param {number} installmentsNumber       how many installments will be
+   * @param {number} interestRate             interest rate in percent (3.5) equal/annuity (false)
+   * @param {boolean} diminishing             if installments will be diminishing (true) or not
+   *
+   * @return {object}
+   */
+
+
+  function Loan(amount, installmentsNumber, interestRate) {
+    var diminishing = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
+
+    /** Checking params */
+    if (!amount || amount <= 0 || !installmentsNumber || installmentsNumber <= 0 || !interestRate || interestRate <= 0) {
+      throw new Error("wrong parameters: ".concat(amount, " ").concat(installmentsNumber, " ").concat(interestRate));
+    }
+
+    var installments = [];
+    var interestSum = 0;
+    var capitalSum = 0;
+    var sum = 0;
+
+    for (var i = 0; i < installmentsNumber; i++) {
+      var inst = getNextInstalment(amount, installmentsNumber, interestRate, diminishing, capitalSum, interestSum);
+      sum += inst.installment;
+      capitalSum += inst.capital;
+      interestSum += inst.interest;
+      /** adding lost sum on rounding */
+
+      if (i === installmentsNumber - 1) {
+        capitalSum += inst.remain;
+        sum += inst.remain;
+        inst.remain = 0;
+      }
+
+      installments.push(inst);
+    }
+
+    return {
+      installments: installments,
+      amount: rnd(amount),
+      interestSum: rnd(interestSum),
+      capitalSum: rnd(capitalSum),
+      sum: rnd(sum)
+    };
+  }
+  /* istanbul ignore next */
+
+
+  if (typeof module === 'undefined') {
+    // browser
+    if ((typeof LOANJS_NAMESPACE === "undefined" ? "undefined" : _typeof(LOANJS_NAMESPACE)) === 'object') {
+      LOANJS_NAMESPACE.Loan = Loan; // eslint-disable-line no-undef
+    } else {
+      if (!window.LoanJS) {
+        window.LoanJS = {};
+      }
+
+      window.LoanJS.Loan = Loan;
+    }
+  } else {
+    // node or browserfy
+    module.exports = Loan;
+  }
+})();
+  </script>
+  <script>
+      "use strict";
+
+function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
+
+(function () {
+  'use strict';
+  /**
+   * Create Loan Object with all installments and sum of interest
+   * @param {Loan}    loan     loan object
+   * @param {object}  params   params
+   *
+   * @return {string}       html string with table
+   */
+
+  function loanToHtmlTable(loan, params) {
+    params = params || {};
+
+    params.formatMoney = params.formatMoney || function (num) {
+      return num.toFixed(2);
+    };
+
+    var fm = params.formatMoney;
+
+    var trans = function trans(key) {
+      if (params.translations && params.translations[key]) {
+        return params.translations[key];
+      } else {
+        return key;
+      }
+    };
+
+    var html = ['<table>' + '<thead>' + '<tr>' + '<th></th>' + '<th>' + trans('Capital') + '</th>' + '<th>' + trans('Interest') + '</th>' + '<th>' + trans('Instalment') + '</th>' + '<th>' + trans('Remain') + '</th>' + '<th>' + trans('Interest sum') + '</th>' + '</tr>' + '</thead>' + '<tbody>', '', // body content [1]
+    '</tbody>' + '</table>'];
+
+    for (var i = 0; i < loan.installments.length; i++) {
+      var inst = loan.installments[i];
+      var instHtml = '<tr>' + '<td>' + (i + 1) + '</td>' + '<td>' + fm(inst.capital) + '</td>' + '<td>' + fm(inst.interest) + '</td>' + '<td>' + fm(inst.installment) + '</td>' + '<td>' + fm(inst.remain) + '</td>' + '<td>' + fm(inst.interestSum) + '</td>' + '</tr>';
+      html[1] += instHtml;
+    }
+
+    html[1] += '<tr>' + '<td>' + trans('sum') + '</td>' + '<td>' + fm(loan.capitalSum) + '</td>' + '<td>' + fm(loan.interestSum) + '</td>' + '<td>' + fm(loan.sum) + '</td>' + '<td>-</td>' + '<td>-</td>' + '</tr>';
+    return html.join('');
+  }
+  /* istanbul ignore next */
+
+
+  if (typeof module === 'undefined') {
+    // browser
+    if ((typeof LOANJS_NAMESPACE === "undefined" ? "undefined" : _typeof(LOANJS_NAMESPACE)) === 'object') {
+      LOANJS_NAMESPACE.loanToHtmlTable = loanToHtmlTable; // eslint-disable-line no-undef
+    } else {
+      if (!window.LoanJS) {
+        window.LoanJS = {};
+      }
+
+      window.LoanJS.loanToHtmlTable = loanToHtmlTable;
+    }
+  } else {
+    // node or browserfy
+    module.exports = loanToHtmlTable;
+  }
+})();
+  </script>
+
+  <script>
+    // jsHint inline helper
+    /* global LoanJS */
+    (function () {
+      var
+        amount = document.getElementById('amount'),
+        months = document.getElementById('months'),
+        interestRate = document.getElementById('interestRate'),
+        equal = document.getElementById('equal'),
+        calculateBtn = document.getElementById('calculate'),
+        div = document.createElement("div"),
+        calc = function () {
+          console.log(LoanJS);
+          var loan_1 = new LoanJS.Loan(
+                        Number(amount.value),
+                        Number(months.value),
+                        Number(interestRate.value),
+                        !equal.checked);
+          div.innerHTML = LoanJS.loanToHtmlTable(loan_1);
+        };
+
+      document.getElementById('tableBox').appendChild(div);
+
+      calculateBtn.addEventListener('click', calc);
+
+      calc();
+    }());
+
+    // loan on 1 000($) in 12 diminishing installments (ex. months) with 5% interest rate
+
+    // var loan_2 = new Loan(500000, 360, 3.5);
+    // console.log(loan_2);
+    // loan on 500 000($) in 360 equal installments (30 years) with 3.5% interest rate
+  </script>
+</body>
+</html>
